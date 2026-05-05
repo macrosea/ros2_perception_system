@@ -6,6 +6,7 @@
 
 各阶段以 `rclcpp_components` 形式运行在同一容器进程内，由生命周期状态机统一管理，支持运行时软重置。
 
+![output](output.gif)
 ---
 
 ## Overview
