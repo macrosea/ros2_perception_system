@@ -2,19 +2,65 @@
 
 #include <NvInfer.h>
 
+#include <unordered_map>
+#include <vector>
+
 #include "perception_system/inference/trt_context.hpp"
 #include "perception_system/inference/trt_engine.hpp"
 
 namespace perception_system {
 
 struct InferenceAdapter::Impl {
-  std::unique_ptr<Engine> engine;
-  std::unique_ptr<Context> context;
+ public:
+  explicit Impl(const std::string& model_path)
 
-  explicit Impl(const std::string& model_path) {
-    engine = std::make_unique<Engine>(model_path);
-    context = std::make_unique<Context>(*engine);
+      : engine_(std::make_unique<Engine>(model_path)),
+        context_(std::make_unique<Context>(*engine_)) {
   }
+
+  std::unordered_map<std::string, std::vector<float>> Infer(const float* input_data,
+                                                            int input_size) const {
+    nvinfer1::Dims input_shape;
+    input_shape.nbDims = 4;
+    input_shape.d[0] = 1;
+    input_shape.d[1] = 3;
+    input_shape.d[2] = input_size;
+    input_shape.d[3] = input_size;
+    return context_->Infer(input_data, input_shape);
+  }
+
+  InferenceAdapter::Output GetInferResult(
+      std::unordered_map<std::string, std::vector<float>>&& outputs, int input_size) const {
+    InferenceAdapter::Output output;
+    if (outputs.empty()) {
+      return output;
+    }
+    // 约束：这里只考虑yolov8s 单头输出
+    auto& first_output = *outputs.begin();
+    output.data = std::move(first_output.second);
+    const TensorInfo* tensor_info = engine_->FindTensor(first_output.first);
+    if (tensor_info == nullptr) {
+      return output;
+    }
+
+    nvinfer1::Dims output_dims = tensor_info->dims;
+    if (output_dims.nbDims > 0 && output_dims.d[0] < 0) {
+      output_dims.nbDims = 4;
+      output_dims.d[0] = 1;
+      output_dims.d[1] = 3;
+      output_dims.d[2] = input_size;
+      output_dims.d[3] = input_size;
+    }
+    for (int i = 0; i < output_dims.nbDims; ++i) {
+      output.shape.push_back(static_cast<int32_t>(output_dims.d[i]));
+    }
+
+    return output;
+  }
+
+ private:
+  std::unique_ptr<Engine> engine_;
+  std::unique_ptr<Context> context_;
 };
 
 InferenceAdapter::InferenceAdapter(const std::string& model_path) {
@@ -28,38 +74,12 @@ bool InferenceAdapter::IsLoaded() const {
 }
 
 InferenceAdapter::Output InferenceAdapter::Infer(const float* input_data, int input_size) {
-  Output output;
   if (!impl_) {
-    return output;
+    return {};
   }
 
-  nvinfer1::Dims input_shape;
-  input_shape.nbDims = 4;
-  input_shape.d[0] = 1;
-  input_shape.d[1] = 3;
-  input_shape.d[2] = input_size;
-  input_shape.d[3] = input_size;
-
-  auto outputs = impl_->context->infer(input_data, input_shape);
-  if (outputs.empty()) {
-    return output;
-  }
-
-  auto& first_output = *outputs.begin();
-  output.data = std::move(first_output.second);
-
-  const TensorInfo* tensor_info = impl_->engine->find_tensor(first_output.first);
-  if (tensor_info != nullptr) {
-    nvinfer1::Dims output_dims = tensor_info->dims;
-    if (output_dims.nbDims > 0 && output_dims.d[0] < 0) {
-      output_dims = input_shape;
-    }
-    for (int i = 0; i < output_dims.nbDims; ++i) {
-      output.shape.push_back(static_cast<int32_t>(output_dims.d[i]));
-    }
-  }
-
-  return output;
+  auto outputs = impl_->Infer(input_data, input_size);
+  return impl_->GetInferResult(std::move(outputs), input_size);
 }
 
 }  // namespace perception_system

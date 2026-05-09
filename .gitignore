@@ -17,6 +17,6 @@ srv/_*.py
 
 *~
 
-
+tmp
 **/resources/video.mp4
 **/models/yolov8s.engine

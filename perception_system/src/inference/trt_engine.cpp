@@ -35,11 +35,10 @@ Engine::Engine(const std::string& engine_path) {
   if (!engine_) {
     throw std::runtime_error("Failed to deserialize engine: " + engine_path);
   }
-
-  parse_tensors();
+  ParseTensors();
 }
 
-void Engine::parse_tensors() {
+void Engine::ParseTensors() {
   const int n = engine_->getNbIOTensors();
   tensors_.reserve(n);
   for (int i = 0; i < n; ++i) {
@@ -53,7 +52,7 @@ void Engine::parse_tensors() {
   }
 }
 
-const TensorInfo* Engine::find_tensor(const std::string& name) const {
+const TensorInfo* Engine::FindTensor(const std::string& name) const {
   for (const auto& t : tensors_) {
     if (t.name == name) return &t;
   }

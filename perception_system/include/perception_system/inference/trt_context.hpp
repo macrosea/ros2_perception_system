@@ -3,10 +3,13 @@
 #include <NvInfer.h>
 #include <cuda_runtime.h>
 
+#include <cstddef>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
+#include "perception_system/inference/buffers.hpp"
 #include "trt_engine.hpp"
 
 namespace perception_system {
@@ -18,14 +21,16 @@ class Context {
 
   Context(const Context&) = delete;
   Context& operator=(const Context&) = delete;
+  Context(Context&&) = delete;
+  Context& operator=(Context&&) = delete;
 
-  std::unordered_map<std::string, std::vector<float>> infer(const void* input_data,
+  std::unordered_map<std::string, std::vector<float>> Infer(const void* input_data,
                                                             const nvinfer1::Dims& input_shape);
 
  private:
-  struct DeviceBuffer {
-    void* ptr = nullptr;
-    size_t bytes = 0;
+  struct TensorBuffers {
+    DeviceBuffer device;
+    PinnedHostBuffer host;
   };
 
   struct TrtDeleter {
@@ -38,13 +43,14 @@ class Context {
   const Engine& engine_;
   std::unique_ptr<nvinfer1::IExecutionContext, TrtDeleter> ctx_;
   cudaStream_t stream_ = nullptr;
+  std::unordered_map<std::string, TensorBuffers> tensor_buffers_;
+  nvinfer1::Dims cached_input_shape_{};
 
-  std::unordered_map<std::string, DeviceBuffer> device_bufs_;
-
-  void allocate_buffers(const nvinfer1::Dims& input_shape);
-  void free_buffers();
-  size_t dims_volume(const nvinfer1::Dims& dims) const;
-  size_t dtype_bytes(nvinfer1::DataType dtype) const;
+  void AllocateBuffers(const nvinfer1::Dims& input_shape);
+  void FreeBuffers();
+  bool SameDims(const nvinfer1::Dims& lhs, const nvinfer1::Dims& rhs) const;
+  size_t DimsVolume(const nvinfer1::Dims& dims) const;
+  size_t DtypeBytes(nvinfer1::DataType dtype) const;
 };
 
 }  // namespace perception_system

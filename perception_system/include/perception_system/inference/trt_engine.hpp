@@ -24,13 +24,13 @@ class Engine {
   Engine(Engine&&) = default;
   Engine& operator=(Engine&&) = default;
 
-  const std::vector<TensorInfo>& tensors() const {
+  const std::vector<TensorInfo>& Tensors() const {
     return tensors_;
   }
 
-  const TensorInfo* find_tensor(const std::string& name) const;
+  const TensorInfo* FindTensor(const std::string& name) const;
 
-  nvinfer1::ICudaEngine* raw() const {
+  nvinfer1::ICudaEngine* Raw() const {
     return engine_.get();
   }
 
@@ -51,7 +51,6 @@ class Engine {
   std::unique_ptr<nvinfer1::IRuntime, TrtDeleter> runtime_;
   std::unique_ptr<nvinfer1::ICudaEngine, TrtDeleter> engine_;
   std::vector<TensorInfo> tensors_;
-
-  void parse_tensors();
+  void ParseTensors();
 };
 }  // namespace perception_system
